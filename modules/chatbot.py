@@ -96,14 +96,14 @@ def execute_query():
     with st.spinner("Executing SQL query..."):
         current_index = st.session_state.index - 1
         query = st.session_state.context["sql_queries"][current_index]
-        try:
-            query_results = execute_sql_query(query)
-            update_context("query_results", query_results, current_index)
-            st.session_state.current_state = "detective"
-        except Exception as e:
-            print(f"Error executing translated query.\nRephrase the question and try again.\nError message: {e}")
-            st.session_state.current_state = None
 
+        query_results = execute_sql_query(query)
+        if not query_results:
+            st.warning("No results found. Try rephrasing your question.")
+            st.session_state.current_state = None
+            return
+        update_context("query_results", query_results, current_index)
+        st.session_state.current_state = "detective"
         st.rerun()
 
 
@@ -145,9 +145,7 @@ def show_query_results(index):
     """Display query results for given message index."""
     query_results = st.session_state.context["query_results"][index]
 
-    # Validate index
     if not query_results:
-        st.warning("Error executing translated query. Rephrase the question and try again.")
         return
 
     with st.expander("Query Results"):
@@ -157,7 +155,17 @@ def show_query_results(index):
 
 def convert_results_to_dataframe(results):
     """Convert query results to DataFrame."""
-    return pd.DataFrame(results)
+    base_df = pd.DataFrame(results)
+    if not base_df.empty:
+        for column in base_df.columns:
+            if "date" in column.lower():
+                try:
+                    base_df[column] = pd.to_datetime(base_df[column], format="%Y%m%d")
+                    base_df[column] = base_df[column].dt.date
+                except ValueError:
+                    pass
+
+    return base_df
 
 
 def show_thinking_process(index):
