@@ -7,9 +7,16 @@ from modules.settings import DB_FILE
 
 def execute_sql_query(extracted_query):
     """Connect to database and execute SQL query"""
+    if not extracted_query:
+        return None
     with sqlite3.connect(DB_FILE) as db_connection:
         cursor = db_connection.cursor()
-        cursor.execute(extracted_query)
+        try:
+            cursor.execute(extracted_query)
+        except Exception as e:
+            print(f"Error executing SQL query: {e}")
+            print(f"Query: {extracted_query}")
+            return None
         results = cursor.fetchall()
 
         column_names = [description[0] for description in cursor.description]
