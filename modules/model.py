@@ -6,7 +6,7 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_ollama import ChatOllama
 
-from modules.database.db import db_without_solution, get_db_schema
+from modules.database.custom_db_schema import CustomDBSchema
 from modules.settings import MODEL
 from modules.tools import model_answer_regex
 
@@ -123,13 +123,13 @@ class Translator(Model):
             input_variables=["input"],
             partial_variables={
                 "dialect": "sqlite",
-                "table_info": get_db_schema(),
+                "table_info": CustomDBSchema.get_table_info(),
             },
         )
 
     def build_langchain(self):
         """Builds and returns a language chain with database and Ollama connections."""
-        db = db_without_solution()
+        db = CustomDBSchema()
         llm = ChatOllama(
             temperature=0,
             seed=1,
