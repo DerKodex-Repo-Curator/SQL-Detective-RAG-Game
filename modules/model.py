@@ -6,9 +6,10 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.runnables import RunnablePassthrough
 from langchain_ollama import ChatOllama
 
-from modules.database.db import db_without_solution, get_db_schema
-from modules.settings import MODEL
-from modules.tools import model_answer_regex
+from modules.database.custom_db_schema import described_db_schema
+from modules.database.db import db_without_solution
+from modules.settings import DETECTIVE_MODEL, TRANSLATOR_MODEL
+from modules.tools import manually_parse_response, model_answer_regex
 
 
 class Model:
@@ -17,6 +18,7 @@ class Model:
     def __init__(self, user_input, context=None):
         self.user_input = user_input
         self.context = context
+        self.model = self.select_model()
         self.full_response = self.get_model_response()
         self.sql_query = self.get_field("sql_query")
         self.answer = self.get_field("answer")
@@ -32,10 +34,12 @@ class Model:
             try:
                 parsed_response = json.loads(response_str)
                 return parsed_response
-            except:
-                return response_str
+            except Exception as e:
+                print(f"Error parsing JSON: {e}\nParsing manually...")
+                parsed_response = manually_parse_response(response_str)
+                return parsed_response
         except Exception as e:
-            return f"Model Connection error. Make sure Ollama is running and {MODEL} is installed.\n{e}"
+            return f"Model Connection error. Make sure Ollama is running and {self.model} is installed.\n{e}"
 
     def get_field(self, field=None):
         """Get SQL query from parsed_response."""
@@ -54,25 +58,29 @@ class Model:
 class Translator(Model):
     """SQL Translator model class."""
 
+    def select_model(self):
+        """Choose the model for translation."""
+        return TRANSLATOR_MODEL
+
     def model_input(self):
         return {
             "input": self.user_input,
             "question": self.user_input,
+            "top_k": 1,
+            "top_p": 0.80,
         }
 
     def prompt(self) -> str:
         """Prompt template to translate text instructions into SQL query"""
         translator = """
-        **ROLE:** You are a SQL Translator. Your task is to translate the following question into a valid SQL query. Use {dialect} dialect.
-
-        **Database Schema:**
-        {table_info}
+        **ROLE:** You are a SQL Analyst. Your task is to translate the following question into a valid SQL query. Use {dialect} dialect.
 
         **Rules:**
-        1. Ensure the output contains a valid SQL query.
+        0. All dates use format YYYYMMDD.
+        1. Output must contain a valid, properly constructed SQL Query.
         2. The query must strictly follow the provided database schema and use only the available tables and columns.
-        3. Keep the thinking process brief, ensuring it logically aligns with the user input.
-        4. Avoid unnecessary complexity—only join tables or include conditions that are directly relevant to the user's question.
+        3. Database schema contains "description" and "format" of the tables and columns contents. Make sure to follow it carefully.
+        4. Keep the thinking process brief, ensuring it logically aligns with the user input.
         5. Fetch all columns by default using 'SELECT *', unless a specific column is mentioned in the input.
         6. Be flexible in interpreting imprecise or incomplete user input while providing a valid SQL query.
         7. Do not use your own knowledge or external sources.
@@ -81,7 +89,20 @@ class Translator(Model):
         10. If the user is asking about the order of items (first, last etc.), use an ORDER BY clause based on the relevant column.
         11. While using columns from multiple tables, ensure you call proper tables.
 
+        **Database Schema:**
+        {table_info}
+
+        **Examples:**
+    
+        User: "find all theft cases from SQL City"
+        SQL Query: "SELECT * FROM crime_scene_report WHERE type = 'theft' AND city = 'SQL City';"
         
+        User: "Find who lives in the first house in Northwestern Dr"
+        SQL Query: "SELECT * FROM person WHERE address_street_name = 'Northwestern Dr' ORDER BY address_number ASC LIMIT 1;"
+        
+        User: "find all people with blue eyes"
+        SQL Query: "SELECT * FROM person JOIN drivers_license ON person.license_id = drivers_license.id WHERE drivers_license.eye_color = 'blue';"
+    
         **Input:** {input}
 
         **Output:**
@@ -89,10 +110,9 @@ class Translator(Model):
         {{
             "user_input": "{input}",
             "sql_query": "SELECT * FROM table_name WHERE condition;"
-            "thinking": "Thinking process.",
-            "rules_followed": "Rules followed while generating answer."
         }}
         top_k: {top_k}
+        top_p: {top_p}
         ```
         """
         return PromptTemplate(
@@ -100,7 +120,7 @@ class Translator(Model):
             input_variables=["input"],
             partial_variables={
                 "dialect": "sqlite",
-                "table_info": get_db_schema(),
+                "table_info": described_db_schema(),
             },
         )
 
@@ -110,9 +130,8 @@ class Translator(Model):
         llm = ChatOllama(
             temperature=0,
             seed=1,
-            model=MODEL,
-            num_predict=512,  # Output tokens limit
-            top_p=0.95,
+            model=self.model,
+            num_predict=1024,  # Output tokens limit
             format="json",
             mirostat=2,
             mirostat_eta=2,
@@ -127,6 +146,10 @@ class Translator(Model):
 
 class Detective(Model):
     """Detective model for analyzing case data and providing conclusions."""
+
+    def select_model(self):
+        """Choose the model for detective."""
+        return DETECTIVE_MODEL
 
     def model_input(self):
         return {
@@ -184,7 +207,7 @@ class Detective(Model):
         llm = ChatOllama(
             temperature=0,
             seed=1,
-            model=MODEL,
+            model=self.model,
             num_predict=1024,  # Output tokens limit
             top_p=0.95,
             format="json",
