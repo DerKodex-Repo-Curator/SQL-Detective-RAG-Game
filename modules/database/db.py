@@ -2,6 +2,7 @@ import sqlite3
 
 from langchain_community.utilities import SQLDatabase
 
+from modules.database.custom_db_schema import described_db_schema
 from modules.settings import DB_FILE
 
 
@@ -23,8 +24,7 @@ def convert_results_to_dict(records, column_names):
 
 
 def get_db_schema():
-    db = db_without_solution()
-    return db.get_table_info()
+    return described_db_schema()
 
 
 def database_connect():
