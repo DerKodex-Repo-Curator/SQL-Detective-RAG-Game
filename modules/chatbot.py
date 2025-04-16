@@ -148,7 +148,7 @@ def show_query_results(index):
 
     # Validate index
     if not query_results:
-        st.warning("Error executing translated query. Rephrase the question and try again.")
+        st.warning("No results found for this query.")
         return
 
     with st.expander("Query Results"):
