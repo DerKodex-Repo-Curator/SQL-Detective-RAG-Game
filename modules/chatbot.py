@@ -2,6 +2,7 @@ import pandas as pd
 import streamlit as st
 
 from modules.database.db import execute_sql_query
+from modules.embeddings import semantic_search
 from modules.model import Detective, Translator
 
 
@@ -100,9 +101,13 @@ def execute_query():
         query_results = execute_sql_query(query)
         if not query_results:
             st.warning("No results found. Try rephrasing your question.")
+            print("Query results are empty.")
             st.session_state.current_state = None
             return
-        update_context("query_results", query_results, current_index)
+    with st.spinner("Performing semantic search..."):
+        user_input = st.session_state.context["user_inputs"][current_index]
+        filtered_results = semantic_search(query_results, user_input)
+        update_context("query_results", filtered_results, current_index)
         st.session_state.current_state = "detective"
         st.rerun()
 
