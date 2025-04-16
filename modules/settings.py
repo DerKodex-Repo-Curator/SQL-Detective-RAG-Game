@@ -1,8 +1,8 @@
 # Easy Model Switch
-# MODEL = "llama3"
-# MODEL = "zephyr:7b"
-MODEL = "deepseek-r1:1.5b"
-# MODEL = "llama3.2:1b"
+DETECTIVE_MODEL = "deepseek-r1:8b"
+# DETECTIVE_MODEL = "deepseek-r1:1.5b"
+# TRANSLATOR_MODEL = "deepseek-r1:1.5b"
+TRANSLATOR_MODEL = "deepseek-r1:8b"
 
 # Switched to local model
 # if MODEL == "llama3":
