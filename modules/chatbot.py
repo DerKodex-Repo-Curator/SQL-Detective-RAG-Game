@@ -35,11 +35,12 @@ def initialize_chat_session():
 
 def display_chat_input():
     if prompt := st.chat_input("Ask about the case..."):
+        fixed_prompt = prompt.replace('"', "'")
         index = st.session_state.index
         st.session_state.current_state = "translator"
         prefill_context()
-        update_context("user_inputs", prompt, index)
-        update_messages("user", prompt, index)
+        update_context("user_inputs", fixed_prompt, index)
+        update_messages("user", fixed_prompt, index)
         st.session_state.index += 1
         st.rerun()
 
