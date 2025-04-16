@@ -2,7 +2,6 @@ import sqlite3
 
 from langchain_community.utilities import SQLDatabase
 
-from modules.database.custom_db_schema import described_db_schema
 from modules.settings import DB_FILE
 
 
@@ -21,10 +20,6 @@ def execute_sql_query(extracted_query):
 def convert_results_to_dict(records, column_names):
     """Convert list of tuples to a list of dictionaries."""
     return [dict(zip(column_names, row)) for row in records]
-
-
-def get_db_schema():
-    return described_db_schema()
 
 
 def database_connect():
